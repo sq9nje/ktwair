@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	u "net/url"
 	"strconv"
 	"time"
 )
@@ -31,12 +32,16 @@ type measurement struct {
 	StatusCode int    `json:"status_code"`
 }
 
-func getStationData(stationID int) ([]byte, error) {
+func getStationData(stationID int, startTime time.Time) ([]byte, error) {
 
 	var baseURL string = "https://powietrze.katowice.eu/data/station/"
 
 	url := baseURL + strconv.FormatInt(int64(stationID), 10)
-	httpClient := http.Client{Timeout: time.Duration(10) * time.Second}
+	if !startTime.IsZero() {
+		url += "?from=" + u.QueryEscape(startTime.Format("2006-01-02 15:04:05"))
+	}
+
+	httpClient := http.Client{Timeout: time.Duration(30) * time.Second}
 	resp, err := httpClient.Get(url)
 	if err != nil {
 		return nil, err
@@ -63,16 +68,29 @@ func printLatest(stationData *station) {
 func main() {
 
 	stationID := 80
+	interval := 60
 
-	stationJSON, err := getStationData(stationID)
-	if err != nil {
-		panic(err)
+	ticker := time.NewTicker(time.Duration(interval) * time.Second)
+
+	lastTimestamp := time.Time{}
+	loc, _ := time.LoadLocation("Europe/Warsaw")
+
+	go func() {
+		for range ticker.C {
+			stationJSON, err := getStationData(stationID, lastTimestamp)
+			if err != nil {
+				log.Printf("ERROR: %v\n", err)
+			} else {
+				stationData := station{}
+				json.Unmarshal(stationJSON, &stationData)
+				lastTimestamp, _ = time.ParseInLocation("2006-01-02 15:04:05", stationData.Sensors[0].Data[len(stationData.Sensors[0].Data)-1].Timestamp, loc)
+
+				printLatest(&stationData)
+			}
+		}
+	}()
+
+	for true {
 	}
-
-	stationData := station{}
-	json.Unmarshal(stationJSON, &stationData)
-
-	fmt.Printf("Station ID: %d\t Station name: %s\n", stationData.ID, stationData.Name)
-	printLatest(&stationData)
 
 }
