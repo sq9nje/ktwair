@@ -84,7 +84,6 @@ func main() {
 				stationData := station{}
 				json.Unmarshal(stationJSON, &stationData)
 				lastTimestamp, _ = time.ParseInLocation("2006-01-02 15:04:05", stationData.Sensors[0].Data[len(stationData.Sensors[0].Data)-1].Timestamp, loc)
-
 				printLatest(&stationData)
 			}
 		}
