@@ -11,22 +11,22 @@ import (
 	"time"
 )
 
-type station struct {
+type Station struct {
 	ID      int      `json:"id"`
 	Name    string   `json:"name"`
 	Address string   `json:"address"`
 	Lat     float64  `json:"lat"`
 	Lon     float64  `json:"lon"`
-	Sensors []sensor `json:"sensors"`
+	Sensors []Sensor `json:"sensors"`
 }
 
-type sensor struct {
+type Sensor struct {
 	Name string        `json:"name"`
 	Unit string        `json:"unit"`
-	Data []measurement `json:"data"`
+	Data []Measurement `json:"data"`
 }
 
-type measurement struct {
+type Measurement struct {
 	Timestamp  string `json:"timestamp"`
 	Value      string `json:"value"`
 	StatusCode int    `json:"status_code"`
@@ -54,7 +54,7 @@ func getStationData(stationID int, startTime time.Time) ([]byte, error) {
 	return body, nil
 }
 
-func printLatest(stationData *station) {
+func printLatest(stationData *Station) {
 	loc, _ := time.LoadLocation("Europe/Warsaw")
 
 	for _, sens := range stationData.Sensors {
@@ -68,7 +68,7 @@ func printLatest(stationData *station) {
 func main() {
 
 	stationID := 80
-	interval := 60
+	interval := 10
 
 	ticker := time.NewTicker(time.Duration(interval) * time.Second)
 
@@ -81,7 +81,7 @@ func main() {
 			if err != nil {
 				log.Printf("ERROR: %v\n", err)
 			} else {
-				stationData := station{}
+				stationData := Station{}
 				json.Unmarshal(stationJSON, &stationData)
 				lastTimestamp, _ = time.ParseInLocation("2006-01-02 15:04:05", stationData.Sensors[0].Data[len(stationData.Sensors[0].Data)-1].Timestamp, loc)
 				printLatest(&stationData)
@@ -89,7 +89,7 @@ func main() {
 		}
 	}()
 
-	for true {
+	for {
 	}
 
 }
