@@ -4,11 +4,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"net/http"
 	u "net/url"
 	"strconv"
 	"time"
+
+	"github.com/sq9nje/ktwair/pkg/logging"
 )
 
 type Station struct {
@@ -48,7 +49,7 @@ func getStationData(stationID int, startTime time.Time) ([]byte, error) {
 	}
 	defer resp.Body.Close()
 
-	log.Printf("INFO: %s %s", url, resp.Status)
+	logging.Logf(logging.INFO, "%s %s", url, resp.Status)
 
 	body, _ := ioutil.ReadAll(resp.Body)
 	return body, nil
@@ -67,6 +68,8 @@ func printLatest(stationData *Station) {
 
 func main() {
 
+	logging.SetLevelFromString("INFO")
+
 	stationID := 80
 	interval := 10
 
@@ -79,7 +82,7 @@ func main() {
 		for range ticker.C {
 			stationJSON, err := getStationData(stationID, lastTimestamp)
 			if err != nil {
-				log.Printf("ERROR: %v\n", err)
+				logging.Logf(logging.ERROR, "%v", err)
 			} else {
 				stationData := Station{}
 				json.Unmarshal(stationJSON, &stationData)
