@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
 	"net/http"
 	u "net/url"
@@ -55,44 +54,49 @@ func getStationData(stationID int, startTime time.Time) ([]byte, error) {
 	return body, nil
 }
 
-func printLatest(stationData *Station) {
+func logLatest(stationData *Station) {
 	loc, _ := time.LoadLocation("Europe/Warsaw")
-
-	for _, sens := range stationData.Sensors {
-		fmt.Printf("\t - %s\n", sens.Name)
-		timestamp, _ := time.ParseInLocation("2006-01-02 15:04:05", sens.Data[len(sens.Data)-1].Timestamp, loc)
-		value, _ := strconv.ParseFloat(sens.Data[len(sens.Data)-1].Value, 64)
-		fmt.Printf("\t\t%v\t%f %s\n", timestamp, value, sens.Unit)
+	for _, s := range stationData.Sensors {
+		timestamp, _ := time.ParseInLocation("2006-01-02 15:04:05", s.Data[len(s.Data)-1].Timestamp, loc)
+		value, _ := strconv.ParseFloat(s.Data[len(s.Data)-1].Value, 64)
+		logging.Logf(logging.DEBUG, "Last measurement %s %v %f %s", s.Name, timestamp, value, s.Unit)
 	}
 }
 
 func main() {
 
-	logging.SetLevelFromString("INFO")
+	logging.SetLevelFromString("DEBUG")
 
 	stationID := 80
-	interval := 10
-
-	ticker := time.NewTicker(time.Duration(interval) * time.Second)
+	interval := 60
 
 	lastTimestamp := time.Time{}
 	loc, _ := time.LoadLocation("Europe/Warsaw")
 
-	go func() {
-		for range ticker.C {
-			stationJSON, err := getStationData(stationID, lastTimestamp)
-			if err != nil {
-				logging.Logf(logging.ERROR, "%v", err)
-			} else {
-				stationData := Station{}
-				json.Unmarshal(stationJSON, &stationData)
-				lastTimestamp, _ = time.ParseInLocation("2006-01-02 15:04:05", stationData.Sensors[0].Data[len(stationData.Sensors[0].Data)-1].Timestamp, loc)
-				printLatest(&stationData)
-			}
-		}
-	}()
-
 	for {
-	}
+		stationJSON, err := getStationData(stationID, lastTimestamp)
+		if err != nil {
+			logging.Logf(logging.ERROR, "%v", err)
+		} else {
+			stationData := Station{}
+			json.Unmarshal(stationJSON, &stationData)
+			// Sort sensor data by timestamp
+			// for _, s := range stationData.Sensors {
+			// 	sort.Slice(s.Data[:], func(i, j int) bool {
+			// 		return s.Data[i].Timestamp < s.Data[j].Timestamp
+			// 	})
 
+			// }
+			lastTimestamp, err = time.ParseInLocation("2006-01-02 15:04:05", stationData.Sensors[0].Data[len(stationData.Sensors[0].Data)-1].Timestamp, loc)
+			if err != nil {
+				logging.Logf(logging.ERROR, "Parsing last timestamp failed: %v", err)
+			} else {
+				logging.Logf(logging.INFO, "Last timestamp: %v", lastTimestamp)
+			}
+
+			logLatest(&stationData)
+		}
+
+		time.Sleep(time.Duration(interval) * time.Second)
+	}
 }
