@@ -25,8 +25,10 @@ type Config struct {
 	MQTT struct {
 		Hostname string `json:"hostname"`
 		Port     int    `json:"port"`
+		UseTLS   bool   `json:"tls"`
 		User     string `json:"user"`
 		Password string `json:"password"`
+		Topic    string `json:"topic"`
 	} `json:"mqtt"`
 }
 
