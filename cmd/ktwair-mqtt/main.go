@@ -12,6 +12,7 @@ import (
 
 func main() {
 
+	// Get config from file
 	_, err := shared.ReadConfig("/home/ux86dp/ktwair/config.json")
 	if err != nil {
 		log.Fatalf("Could not read config: %v\n", err)
@@ -22,6 +23,7 @@ func main() {
 	lastTimestamp := time.Time{}
 	loc, _ := time.LoadLocation("Europe/Warsaw")
 
+	// Infinite loop
 	for {
 		stationJSON, err := ktwair.GetStationData(shared.GlobalConfig.KTWAir.StationID, lastTimestamp)
 		if err != nil {
@@ -29,6 +31,7 @@ func main() {
 		} else {
 			stationData := ktwair.Station{}
 			json.Unmarshal(stationJSON, &stationData)
+			// Number of returned datapoints can be 0 depending on the startTime
 			if len(stationData.Sensors) > 0 {
 				lastTimestamp, err = time.ParseInLocation("2006-01-02 15:04:05", stationData.Sensors[0].Data[len(stationData.Sensors[0].Data)-1].Timestamp, loc)
 				if err != nil {
