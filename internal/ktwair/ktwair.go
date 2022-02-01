@@ -1,6 +1,7 @@
 package ktwair
 
 import (
+	"encoding/json"
 	"io/ioutil"
 	"net/http"
 	u "net/url"
@@ -15,8 +16,8 @@ type Station struct {
 	ID      int      `json:"id"`
 	Name    string   `json:"name"`
 	Address string   `json:"address"`
-	Lat     float64  `json:"lat"`
-	Lon     float64  `json:"lon"`
+	Lat     string   `json:"lat"`
+	Lon     string   `json:"lon"`
 	Sensors []Sensor `json:"sensors"`
 }
 
@@ -32,8 +33,33 @@ type Measurement struct {
 	StatusCode int    `json:"status_code"`
 }
 
+// Return the number of datapoints for a Sensor
+func (s *Sensor) NumData() int {
+	return len(s.Data)
+}
+
+// Return the time of the last timestamp in the Sensor Data
+func (s *Sensor) LastTimestamp() (time.Time, error) {
+	loc, _ := time.LoadLocation("Europe/Warsaw")
+	return time.ParseInLocation("2006-01-02 15:04:05", s.Data[len(s.Data)-1].Timestamp, loc)
+}
+
+// Translate sensor names to English
+func (sens *Sensor) ToEN() string {
+	switch sens.Name {
+	case "temperatura":
+		return "temperature"
+	case "ciśnienie":
+		return "pressure"
+	case "wilgotność":
+		return "humidity"
+	default:
+		return sens.Name
+	}
+}
+
 // Get the measurement data from the specified station as a JSON
-func GetStationData(stationID int, startTime time.Time) ([]byte, error) {
+func getRawJSON(stationID int, startTime time.Time) ([]byte, error) {
 
 	url := shared.GlobalConfig.KTWAir.BaseURL + strconv.FormatInt(int64(stationID), 10)
 	if !startTime.IsZero() {
@@ -53,33 +79,35 @@ func GetStationData(stationID int, startTime time.Time) ([]byte, error) {
 	return body, nil
 }
 
-// Translate sensor names to English
-func SensorNameToEN(name string) string {
-	switch name {
-	case "temperatura":
-		return "temperature"
-	case "ciśnienie":
-		return "pressure"
-	case "wilgotność":
-		return "humidity"
+// Fetch data for a monitoring station and unmarshal to a Station struct
+func (s *Station) Fetch(stationID int, startTime time.Time) error {
+	rawJSON, err := getRawJSON(stationID, startTime)
+	if err != nil {
+		return err
 	}
-	return name
+
+	err = json.Unmarshal(rawJSON, s)
+	return err
+}
+
+// Return the number of sensors for a Station
+func (s *Station) NumSensors() int {
+	return len(s.Sensors)
 }
 
 // Print latest measurement values in the log
-func LogLatest(stationData *Station) {
-	loc, _ := time.LoadLocation("Europe/Warsaw")
-	for _, s := range stationData.Sensors {
-		timestamp, err := time.ParseInLocation("2006-01-02 15:04:05", s.Data[len(s.Data)-1].Timestamp, loc)
+func (s *Station) LogLatest() {
+	for _, sens := range s.Sensors {
+		timestamp, err := sens.LastTimestamp()
 		if err != nil {
 			logging.Logf(logging.ERROR, "%s: Parsing timestamp failed: %v", s.Name, err)
-			return
+			continue
 		}
-		value, err := strconv.ParseFloat(s.Data[len(s.Data)-1].Value, 64)
+		value, err := strconv.ParseFloat(sens.Data[len(sens.Data)-1].Value, 64)
 		if err != nil {
 			logging.Logf(logging.ERROR, "%s: Parsing value failed: %v", s.Name, err)
-			return
+			continue
 		}
-		logging.Logf(logging.DEBUG, "%s %v %f %s", SensorNameToEN(s.Name), timestamp, value, s.Unit)
+		logging.Logf(logging.DEBUG, "%s %v %f %s", sens.ToEN(), timestamp, value, sens.Unit)
 	}
 }

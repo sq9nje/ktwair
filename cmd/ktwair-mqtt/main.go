@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"log"
 	"time"
 
@@ -21,33 +20,25 @@ func main() {
 	logging.SetLevelFromString(shared.GlobalConfig.LogLevel)
 
 	lastTimestamp := time.Time{}
-	loc, _ := time.LoadLocation("Europe/Warsaw")
 
 	// Infinite loop
 	for {
-		stationJSON, err := ktwair.GetStationData(shared.GlobalConfig.KTWAir.StationID, lastTimestamp)
-		if err != nil {
-			logging.Logf(logging.ERROR, "Failed to fetch station data: %v", err)
-			continue
-		}
-
 		stationData := ktwair.Station{}
-		err = json.Unmarshal(stationJSON, &stationData)
+		err = stationData.Fetch(shared.GlobalConfig.KTWAir.StationID, lastTimestamp)
 		if err != nil {
-			logging.Logf(logging.ERROR, "Could not unmarshall station data: %v", err)
+			logging.Logf(logging.ERROR, "Could not fetch station data: %v", err)
 			continue
 		}
 
 		// Number of returned datapoints can be 0 depending on the startTime
-		if len(stationData.Sensors) > 0 {
-			lastTimestamp, err = time.ParseInLocation("2006-01-02 15:04:05", stationData.Sensors[0].Data[len(stationData.Sensors[0].Data)-1].Timestamp, loc)
+		if stationData.NumSensors() > 0 {
+			lastTimestamp, err = stationData.Sensors[0].LastTimestamp()
 			if err != nil {
 				logging.Logf(logging.ERROR, "Parsing last timestamp failed: %v", err)
-			} else {
-				logging.Logf(logging.INFO, "Number of records %d Last timestamp: %v", len(stationData.Sensors[0].Data), lastTimestamp)
 			}
 
-			ktwair.LogLatest(&stationData)
+			logging.Logf(logging.INFO, "Number of records %d Last timestamp: %v", stationData.Sensors[0].NumData(), lastTimestamp)
+			stationData.LogLatest()
 
 		} else {
 			logging.Logf(logging.DEBUG, "No sensor data returned")
